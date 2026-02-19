@@ -1,8 +1,11 @@
-# stace (WIP)
+# stace
 
 [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
 
 stace automates the Steam account creation flow, including email verification handling. It's experimental and intended for educational or testing purposes only — do not use it to violate Steam's terms of service.
+
+Name
+- `stace` is a short, memorable name derived from the phrase "Steam Account Creator" — letters were chosen to form a concise project name.
 
 Features
 - Automates Steam account creation flow
