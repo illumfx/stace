@@ -38,11 +38,16 @@ EMAIL_USER=you@example.com
 EMAIL_PASSWORD=supersecret
 ```
 
-3. Run the script:
+3. Run the script (CLI)
 
 ```bash
-python main.py
+python main.py --help
+python main.py --chrome-path /usr/bin/chromium --driver-path /tmp/chromedriver --password-length 16
 ```
+
+Behavior notes
+- The CLI will retry the full flow a small number of times if the browser session unexpectedly closes (errors like "invalid session id" or "session deleted").
+- You can set `PASSWORD_LENGTH` or pass `--password-length` to control generated password length.
 
 Notes & safety
 - The script uses `undetected-chromedriver` to reduce automation detection; this may not always work and could violate site terms.

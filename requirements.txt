@@ -2,5 +2,7 @@ black
 python-dotenv
 imbox
 selenium
+colorama
+click
 undetected-chromedriver
 setuptools

@@ -12,15 +12,36 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from dotenv import load_dotenv
+import click
+from colorama import init as colorama_init, Fore, Style
 
 load_dotenv()
+
+# Initialize colorama for colored console output
+colorama_init(autoreset=True)
+
+
+def info(msg: str):
+    print(f"{Fore.CYAN}{msg}{Style.RESET_ALL}")
+
+
+def success(msg: str):
+    print(f"{Fore.GREEN}{msg}{Style.RESET_ALL}")
+
+
+def warn(msg: str):
+    print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}")
+
+
+def error(msg: str):
+    print(f"{Fore.RED}{msg}{Style.RESET_ALL}")
 
 
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
 EMAIL_USER = os.environ.get("EMAIL_USER")
 EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
 PASSWORD_GENERATION_CHARS = string.ascii_letters + string.digits + string.punctuation
-PASSWORD_LENGTH = 16
+PASSWORD_LENGTH = os.environ.get("PASSWORD_LENGTH", 16)  # Default to 16 if not set
 
 ACCOUNT_CREATION_PAGE = "https://store.steampowered.com/join"
 
@@ -37,6 +58,41 @@ def create_driver(chrome_path: str = "/usr/bin/chromium", driver_path: str = "/t
     )
 
     return uc.Chrome(options=options, browser_executable_path=chrome_path, driver_executable_path=driver_path)
+
+
+def run_once(driver, password_length: int) -> bool:
+    """Run the full registration flow once using an existing `driver`.
+
+    Returns True on success. This function does NOT create or quit the driver;
+    driver lifecycle is managed by the caller.
+    """
+    current_email = generate_random_email()
+    password = generate_password(password_length)
+    username = generate_username()
+
+    info(f"Target Email: {current_email}")
+    info(f"User: {username} | Pass: {password}")
+
+    # Start the flow using provided driver
+    proceed_until_verification(current_email, driver)
+
+    verification_link = get_steam_verification_link("noreply@steampowered.com", current_email)
+
+    driver.switch_to.new_window('tab')
+    driver.get(verification_link)
+    time.sleep(5)
+    driver.close()
+
+    driver.switch_to.window(driver.window_handles[0])
+    success_flag = finalize_registration(username, password, driver)
+
+    if success_flag:
+        with open("accounts.txt", "a") as f:
+            f.write(f"{datetime.now()}: {current_email} | {username} | {password}\n")
+        success("💾 Account details saved to accounts.txt")
+        return True
+
+    return False
 
 def get_steam_verification_link(sender: str, sent_to: str):
     steam_url_pattern = r'https://store\.steampowered\.com/account/newaccountverification\?[\w\?&=%-]+'
@@ -61,17 +117,17 @@ def get_steam_verification_link(sender: str, sent_to: str):
                         match = re.search(steam_url_pattern, body_content)
                         if match:
                             verification_url = match.group(0)
-                            print(f"✅ Found Link: {verification_url}")
-                            
+                            success(f"✅ Found Link: {verification_url}")
+
                             # --- DELETE THE EMAIL ---
                             imbox.delete(uid)
-                            print(f"🗑️ Email {uid} deleted from server.")
-                            
+                            info(f"🗑️ Email {uid} deleted from server.")
+
                             return verification_url
                             
-            print("Link not found yet. Checking again...")
+            info("Link not found yet. Checking again...")
         except Exception as e:
-            print(f"Mail Error: {e}")
+            error(f"Mail Error: {e}")
             
         time.sleep(5)
 
@@ -84,10 +140,10 @@ def proceed_until_verification(email: str, driver):
         # Wait a moment for the popup to potentially appear
         cookie_reject_btn = wait.until(EC.element_to_be_clickable((By.ID, "rejectAllButton")))
         cookie_reject_btn.click()
-        print("✅ Cookie banner dismissed.")
+        success("✅ Cookie banner dismissed.")
     except Exception:
         # If it doesn't appear, just move on
-        print("ℹ️ No cookie banner detected.")
+        info("ℹ️ No cookie banner detected.")
     
     # Fill email fields
     wait.until(EC.presence_of_element_located((By.ID, "email"))).send_keys(email)
@@ -101,7 +157,7 @@ def proceed_until_verification(email: str, driver):
     driver.switch_to.default_content()
 
     # --- 2. The Wait-for-Solve Logic ---
-    print("Waiting for captcha to be fully solved...")
+    info("Waiting for captcha to be fully solved...")
     
     # We check the hidden hCaptcha response field. 
     # It only gets a value once the captcha is solved (either auto-checked or image-solved).
@@ -115,11 +171,11 @@ def proceed_until_verification(email: str, driver):
         token = driver.execute_script("return document.getElementsByName('h-captcha-response')[0] ? document.getElementsByName('h-captcha-response')[0].value : '';")
         
         if token and not is_challenging:
-            print("✅ Captcha token detected and no challenge active. Proceeding...")
+            success("✅ Captcha token detected and no challenge active. Proceeding...")
             break
         
         if is_challenging:
-            print("🕒 Challenge active... awaiting user input.")
+            warn("🕒 Challenge active... awaiting user input.")
         
         time.sleep(2)
 
@@ -131,13 +187,13 @@ def proceed_until_verification(email: str, driver):
         over_age_btn = wait.until(EC.element_to_be_clickable((By.ID, "overAgeButton")))
         over_age_btn.click()
     except Exception as e:
-        print("Could not find OverAge button. Steam might have flagged the session.")
+        warn("Could not find OverAge button. Steam might have flagged the session.")
         
 def finalize_registration(username: str, password: str, driver) -> bool:
     wait = WebDriverWait(driver, 15)
     
     while True:
-        print(f"Attempting registration with User: {username}")
+        info(f"Attempting registration with User: {username}")
         
         # 1. Wait for fields to be visible
         try:
@@ -145,7 +201,7 @@ def finalize_registration(username: str, password: str, driver) -> bool:
             password_input = driver.find_element(By.ID, "password")
             reenter_password_input = driver.find_element(By.ID, "reenter_password")
         except Exception as e:
-            print(f"❌ Could not find input fields: {e}")
+            error(f"❌ Could not find input fields: {e}")
             return False
 
         # 2. Clear and fill
@@ -171,11 +227,11 @@ def finalize_registration(username: str, password: str, driver) -> bool:
         
         if errors and errors[0].is_displayed() and len(errors[0].text.strip()) > 0:
             error_text = errors[0].text
-            print(f"❌ Steam Error: {error_text}")
+            error(f"❌ Steam Error: {error_text}")
             
             # Check if we should retry
             if any(msg in error_text.lower() for msg in ["account name", "password", "available"]):
-                print("🔄 Regenerating credentials and retrying...")
+                warn("🔄 Regenerating credentials and retrying...")
                 username = generate_username()
                 password = generate_password()
                 continue 
@@ -185,12 +241,12 @@ def finalize_registration(username: str, password: str, driver) -> bool:
         # 5. Check for Success
         # If the accountname input is gone, or we see a success message/redirect
         if len(driver.find_elements(By.ID, "accountname")) == 0:
-            print(f"✅ Account successfully created: {username}")
+            success(f"✅ Account successfully created: {username}")
             return True
         
         # Fallback: if no error is shown but we are still on the same page,
         # Steam might be lagging. Wait a bit longer.
-        print("Waiting for response...")
+        info("Waiting for response...")
         time.sleep(2)
     
 
@@ -250,44 +306,60 @@ def generate_random_email():
     return alias_format.replace("[PLACEHOLDER]", random_suffix)
 
 
-if __name__ == "__main__":
-    # 1. Initialize data
-    current_email = generate_random_email()
-    password, username = generate_password(), generate_username()
-    print(f"Target Email: {current_email}")
-    print(f"User: {username} | Pass: {password}")
-
+@click.command()
+@click.option("--amount", default=1, help="Number of accounts to create in this run")
+@click.option("--chrome-path", default="/usr/bin/chromium", help="Path to chromium binary")
+@click.option("--driver-path", default="/tmp/chromedriver", help="Path to chromedriver")
+@click.option("--alias-format", default=os.environ.get("ALIAS_FORMAT", "test+[PLACEHOLDER]@example.com"), help="Alias format for generated emails (must contain [PLACEHOLDER])")
+@click.option("--password-length", default=int(os.environ.get("PASSWORD_LENGTH", PASSWORD_LENGTH)), help="Length of generated passwords")
+@click.option("--retries", default=2, help="Number of times to retry on 'invalid session id' errors")
+def main(amount, chrome_path, driver_path, alias_format, password_length, retries):
+    """Run stace from the command line."""
+    # propagate alias format into env for generate_random_email
+    os.environ["ALIAS_FORMAT"] = alias_format
     driver = None
     try:
-        # 2. Create driver and start the registration process
-        driver = create_driver()
-        proceed_until_verification(current_email, driver)
+        driver = create_driver(chrome_path, driver_path)
 
-        # 3. Fetch the link from email (and delete it)
-        verification_link = get_steam_verification_link("noreply@steampowered.com", current_email)
-        
-        # 4. Open verification tab
-        driver.switch_to.new_window('tab')
-        driver.get(verification_link)
-        time.sleep(5)  # Let Steam process the verification
-        driver.close()
-        
-        # 5. Finalize registration on the original tab
-        driver.switch_to.window(driver.window_handles[0])
-        success = finalize_registration(username, password, driver)
-        
-        if success:
-            with open("accounts.txt", "a") as f:
-                f.write(f"{datetime.now()}: {current_email} | {username} | {password}\n")
-            print("💾 Account details saved to accounts.txt")
-
-    except Exception as e:
-        print(f"🚨 Critical Script Error: {e}")
+        for i in range(amount):
+            info(f"\n=== Starting account creation #{i+1} of {amount} ===")
+            attempt = 0
+            while attempt <= retries:
+                try:
+                    success_run = run_once(driver, password_length)
+                    if success_run:
+                        # success for this account, move on to next
+                        break
+                    else:
+                        warn("Registration flow completed but account creation failed for this account.")
+                        break
+                except Exception as e:
+                    msg = str(e).lower()
+                    # Retry for invalid session id / session deleted errors
+                    if "invalid session id" in msg or "session deleted" in msg or "chrome not reachable" in msg:
+                        attempt += 1
+                        warn(f"Browser session error detected: {e} — recreating driver and retrying ({attempt}/{retries})...")
+                        # try to recreate driver before retrying
+                        try:
+                            if driver:
+                                driver.quit()
+                        except Exception:
+                            pass
+                        driver = create_driver(chrome_path, driver_path)
+                        time.sleep(2)
+                        continue
+                    else:
+                        error(f"🚨 Critical Script Error: {e}")
+                        raise
+        # end for
     finally:
-        # This runs NO MATTER WHAT (error or success)
-        print("🧹 Cleaning up: Closing browser...")
+        info("🧹 Cleaning up: Closing browser...")
         if driver:
             try:
                 driver.quit()
             except Exception:
                 pass
+
+
+if __name__ == "__main__":
+    main()
