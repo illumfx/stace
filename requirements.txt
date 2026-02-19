@@ -1,0 +1,6 @@
+black
+python-dotenv
+imbox
+selenium
+undetected-chromedriver
+setuptools

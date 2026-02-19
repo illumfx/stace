@@ -1,4 +1,16 @@
-# ---> Python
+# 
+accounts.txt
+
+__pycache__/
+*.pyc
+.env
+venv/
+env/
+/.venv
+chromedriver
+chromedriver.log
+accounts.txt
+*.log# ---> Python
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

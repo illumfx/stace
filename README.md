@@ -1,3 +1,55 @@
-# stace
+# stace (WIP)
 
-(St)eam-(A)ccount-(C)r(e)ator
+[![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
+
+stace automates the Steam account creation flow, including email verification handling. It's experimental and intended for educational or testing purposes only — do not use it to violate Steam's terms of service.
+
+Features
+- Automates Steam account creation flow
+- Waits for and extracts the verification link from an IMAP inbox
+- Simple username/password generation using wordlists
+
+Requirements
+- Python 3.8+
+- See `requirements.txt` for dependencies
+
+Environment
+Set environment variables (recommended via a `.env` file):
+
+- `EMAIL_HOST` (IMAP host, default: `localhost`)
+- `EMAIL_USER` (IMAP username)
+- `EMAIL_PASSWORD` (IMAP password)
+
+Quick start
+
+1. Create and activate a virtualenv:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+2. Add a `.env` file with your IMAP credentials:
+
+```text
+EMAIL_HOST=imap.example.com
+EMAIL_USER=you@example.com
+EMAIL_PASSWORD=supersecret
+```
+
+3. Run the script:
+
+```bash
+python main.py
+```
+
+Notes & safety
+- The script uses `undetected-chromedriver` to reduce automation detection; this may not always work and could violate site terms.
+- Use responsibly and only against accounts/resources you own or have permission to test.
+
+Contributing
+- Bug reports and small improvements welcome. Keep changes focused and add tests where appropriate.
+
+License
+- No license file included — add one if you plan to publish this repository.
