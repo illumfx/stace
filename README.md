@@ -71,4 +71,4 @@ Contributing
 - Bug reports and small improvements welcome. Keep changes focused and add tests where appropriate.
 
 License
-- No license file included — add one if you plan to publish this repository.
+- MIT License
