@@ -56,6 +56,17 @@ Notes & safety
 - The script uses `undetected-chromedriver` to reduce automation detection; this may not always work and could violate site terms.
 - Use responsibly and only against accounts/resources you own or have permission to test.
 
+Troubleshooting
+- If you see the error "TypeError: Binary Location Must be a String" this is a known issue reported against `undetected-chromedriver`: https://github.com/ultrafunkamsterdam/undetected-chromedriver/issues/1544
+
+	Workarounds:
+	- Ensure the Chrome/Chromium binary path you pass to the driver is a valid string (e.g. `/usr/bin/chromium`).
+	- If you set env vars like `CHROME_PATH` or `CHROMEDRIVER_PATH`, confirm they're non-empty strings.
+	- Upgrade `undetected-chromedriver` to the latest version where the bug may be fixed.
+	- As a temporary workaround, try using the system Chrome/Chromium binary explicitly and ensure your `create_driver()` call receives the correct string paths.
+
+	See the upstream issue for discussion and additional context: https://github.com/ultrafunkamsterdam/undetected-chromedriver/issues/1544
+
 Contributing
 - Bug reports and small improvements welcome. Keep changes focused and add tests where appropriate.
 
