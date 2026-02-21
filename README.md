@@ -2,7 +2,7 @@
 
 [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
 
-stace automates the Steam account creation flow, including email verification handling. It's experimental and intended for educational or testing purposes only — do not use it to violate Steam's terms of service.
+stace automates the Steam account creation flow, including email verification handling.
 
 Name
 - `stace` is a short, memorable name derived from the phrase "Steam Account Creator" — letters were chosen to form a concise project name.
@@ -22,6 +22,8 @@ Set environment variables (recommended via a `.env` file):
 - `EMAIL_HOST` (IMAP host, default: `localhost`)
 - `EMAIL_USER` (IMAP username)
 - `EMAIL_PASSWORD` (IMAP password)
+- `ALIAS_FORMAT=test+[PLACEHOLDER]@example.com` (Alias format, "[PLACEHOLDER]" will be replaced with a random string.)
+- `PASSWORD_LENGTH` (Optional password lenght)
 
 Quick start
 
