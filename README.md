@@ -5,7 +5,7 @@
 stace automates the Steam account creation flow, including email verification handling.
 
 Name
-- `stace` is a short, memorable name derived from the phrase "Steam Account Creator" — letters were chosen to form a concise project name.
+- `stace` is a short, memorable name derived from the phrase "Steam Account Creator" - letters were chosen to form a concise project name.
 
 Features
 - Automates Steam account creation flow
