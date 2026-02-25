@@ -50,6 +50,12 @@ python main.py --help
 python main.py --chrome-path /usr/bin/chromium --driver-path /tmp/chromedriver --password-length 16
 ```
 
+Optional: Post to [kuroi](https://github.com/illumfx/kuroi) instance
+```bash
+python main.py --amount 2 --password-length 16 --kuroi-base-url "https://kuroi.example.com/" --kuroi-api-key "kuroi_SECRET_API_KEY"
+```
+
+
 Behavior notes
 - The CLI will retry the full flow a small number of times if the browser session unexpectedly closes (errors like "invalid session id" or "session deleted").
 - You can set `PASSWORD_LENGTH` or pass `--password-length` to control generated password length.

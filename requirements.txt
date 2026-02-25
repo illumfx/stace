@@ -6,3 +6,4 @@ colorama
 click
 undetected-chromedriver
 setuptools
+requests

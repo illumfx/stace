@@ -13,6 +13,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from dotenv import load_dotenv
 import click
 from colorama import init as colorama_init, Fore, Style
+import requests
 
 load_dotenv()
 
@@ -66,7 +67,7 @@ def create_driver(
     )
 
 
-def run_once(driver, password_length: int) -> bool:
+def run_once(driver, password_length: int):
     """Run the full registration flow once using an existing `driver`.
 
     Returns True on success. This function does NOT create or quit the driver;
@@ -98,9 +99,52 @@ def run_once(driver, password_length: int) -> bool:
         with open("accounts.txt", "a") as f:
             f.write(f"{datetime.now()}: {current_email} | {username} | {password}\n")
         success("💾 Account details saved to accounts.txt")
-        return True
+        return True, current_email, username, password
 
-    return False
+    return False, None, None, None
+
+
+def post_to_kuroi(
+    base_url: str,
+    api_key: str,
+    email: str,
+    username: str,
+    password: str,
+    ban_type: str = "None",
+    is_public: bool = False,
+):
+    """Post account data to a kuroi instance at {base_url}/accounts.
+
+    Requires a `base_url` (e.g. https://kuroi.example.com) and `api_key`.
+    """
+    if not base_url or not api_key:
+        warn("kuroi base_url or api_key not provided; skipping POST")
+        return None
+
+    url = base_url.rstrip("/") + "/accounts"
+    headers = {
+        "Content-Type": "application/json",
+        "X-API-Key": api_key,
+    }
+    payload = {
+        "username": username,
+        "password": password,
+        "email": email,
+        "ban_type": ban_type,
+        "is_public": bool(is_public),
+    }
+
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=10)
+        if resp.status_code >= 200 and resp.status_code < 300:
+            success(f"🔗 Posted account to kuroi: {username} @ {url}")
+            return resp
+        else:
+            warn(f"kuroi POST failed ({resp.status_code}): {resp.text}")
+            return resp
+    except Exception as e:
+        error(f"Failed to POST to kuroi: {e}")
+        return None
 
 
 def get_steam_verification_link(sender: str, sent_to: str):
@@ -364,7 +408,39 @@ def generate_random_email():
     default=2,
     help="Number of times to retry on 'invalid session id' errors",
 )
-def main(amount, chrome_path, driver_path, alias_format, password_length, retries):
+@click.option(
+    "--kuroi-base-url",
+    default=os.environ.get("KUROI_BASE_URL", ""),
+    help="Base URL for kuroi instance (e.g. https://kuroi.example.com)",
+)
+@click.option(
+    "--kuroi-api-key",
+    default=os.environ.get("KUROI_API_KEY", ""),
+    help="API key for kuroi (can also be set via KUROI_API_KEY)",
+)
+@click.option(
+    "--kuroi-ban-type",
+    default=os.environ.get("KUROI_BAN_TYPE", "None"),
+    help="Default ban_type to send to kuroi",
+)
+@click.option(
+    "--kuroi-is-public",
+    is_flag=True,
+    default=False,
+    help="Mark created account as public when posting to kuroi",
+)
+def main(
+    amount,
+    chrome_path,
+    driver_path,
+    alias_format,
+    password_length,
+    retries,
+    kuroi_base_url,
+    kuroi_api_key,
+    kuroi_ban_type,
+    kuroi_is_public,
+):
     """Run stace from the command line."""
     # propagate alias format into env for generate_random_email
     os.environ["ALIAS_FORMAT"] = alias_format
@@ -377,14 +453,25 @@ def main(amount, chrome_path, driver_path, alias_format, password_length, retrie
             attempt = 0
             while attempt <= retries:
                 try:
-                    success_run = run_once(driver, password_length)
+                    success_run, email_addr, username, password = run_once(
+                        driver, password_length
+                    )
                     if success_run:
+                        # Optional: POST to kuroi instance if configured
+                        if kuroi_base_url and kuroi_api_key:
+                            post_to_kuroi(
+                                kuroi_base_url,
+                                kuroi_api_key,
+                                email_addr,
+                                username,
+                                password,
+                                ban_type=kuroi_ban_type,
+                                is_public=kuroi_is_public,
+                            )
                         # success for this account, move on to next
                         break
                     else:
-                        warn(
-                            "Registration flow completed but account creation failed for this account."
-                        )
+                        warn("Registration flow completed but account creation failed for this account.")
                         break
                 except Exception as e:
                     msg = str(e).lower()
