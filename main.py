@@ -313,10 +313,11 @@ def finalize_registration(username: str, password: str, driver) -> bool:
                 return False
 
         # 5. Check for Success
-        # If the accountname input is gone, or we see a success message/redirect
-        if len(driver.find_elements(By.ID, "accountname")) == 0:
+        # If the account_pulldown element is available, we are successfully logged in.
+        if len(driver.find_elements(By.ID, "account_pulldown")) == 1:
             success(f"✅ Account successfully created: {username}")
             return True
+
 
         # Fallback: if no error is shown but we are still on the same page,
         # Steam might be lagging. Wait a bit longer.
