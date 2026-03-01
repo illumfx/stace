@@ -96,12 +96,69 @@ def run_once(driver, password_length: int):
     success_flag = finalize_registration(username, password, driver)
 
     if success_flag:
+        steam_id = get_steam_id(driver)
         with open("accounts.txt", "a") as f:
-            f.write(f"{datetime.now()}: {current_email} | {username} | {password}\n")
+            f.write(
+                f"{datetime.now()}: {current_email} | {username} | {password} | {steam_id}\n"
+            )
         success("💾 Account details saved to accounts.txt")
-        return True, current_email, username, password
+        return True, current_email, username, password, steam_id
 
-    return False, None, None, None
+    return False, None, None, None, None
+
+
+def get_steam_id(driver) -> str:
+    steam_id_pattern = re.compile(r'"steamid"\s*:\s*"(\d{17})"')
+
+    # Attempt 1: read g_steamID on the current page
+    try:
+        steam_id = driver.execute_script(
+            "return typeof g_steamID !== 'undefined' ? g_steamID : null;"
+        )
+        if steam_id and str(steam_id).isdigit():
+            return str(steam_id)
+    except Exception:
+        pass
+
+    # Attempt 2: navigate to the store account page and read g_steamID
+    try:
+        driver.get("https://store.steampowered.com/account/")
+        time.sleep(4)
+        steam_id = driver.execute_script(
+            "return typeof g_steamID !== 'undefined' ? g_steamID : null;"
+        )
+        if steam_id and str(steam_id).isdigit():
+            return str(steam_id)
+    except Exception:
+        pass
+
+    # Attempt 3: /my redirects to /profiles/<steamid64>
+    try:
+        driver.get("https://steamcommunity.com/my")
+        time.sleep(4)
+        current_url = driver.current_url
+        url_match = re.search(r"/profiles/(\d{17})", current_url)
+        if url_match:
+            return url_match.group(1)
+    except Exception:
+        pass
+
+    # Attempt 4: parse steamid from page source
+    try:
+        steam_id = driver.execute_script(
+            "return typeof g_steamID !== 'undefined' ? g_steamID : null;"
+        )
+        if steam_id and str(steam_id).isdigit():
+            return str(steam_id)
+
+        match = steam_id_pattern.search(driver.page_source)
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+
+    warn("⚠️ Could not retrieve SteamID from session.")
+    return "unknown"
 
 
 def post_to_kuroi(
@@ -110,6 +167,7 @@ def post_to_kuroi(
     email: str,
     username: str,
     password: str,
+    steam_id: str = "unknown",
     ban_type: str = "None",
     is_public: bool = False,
 ):
@@ -130,6 +188,7 @@ def post_to_kuroi(
         "username": username,
         "password": password,
         "email": email,
+        "steam_id": steam_id,
         "ban_type": ban_type,
         "is_public": bool(is_public),
     }
@@ -264,30 +323,17 @@ def finalize_registration(username: str, password: str, driver) -> bool:
     while True:
         info(f"Attempting registration with User: {username}")
 
-        # 1. Wait for fields to be visible
+        # 1. Fill fields just-in-time to avoid stale references
         try:
-            account_input = wait.until(
-                EC.visibility_of_element_located((By.ID, "accountname"))
-            )
-            password_input = driver.find_element(By.ID, "password")
-            reenter_password_input = driver.find_element(By.ID, "reenter_password")
+            _fill_field(driver, wait, "accountname", username)
+            _fill_field(driver, wait, "password", password)
+            _fill_field(driver, wait, "reenter_password", password)
         except Exception as e:
             error(f"❌ Could not find input fields: {e}")
             return False
 
-        # 2. Clear and fill
-        account_input.clear()
-        account_input.send_keys(username)
-        time.sleep(random.uniform(0.5, 1.5))  # Mimic human typing delay
-        password_input.clear()
-        password_input.send_keys(password)
-        time.sleep(random.uniform(0.5, 1.5))  # Mimic human typing delay
-        reenter_password_input.clear()
-        reenter_password_input.send_keys(password)
-        time.sleep(random.uniform(0.5, 1.5))  # Mimic human typing delay
-
-        # 3. Submit
-        submit_btn = driver.find_element(By.ID, "createAccountButton")
+        # 2. Submit (re-locate button right before click)
+        submit_btn = wait.until(EC.element_to_be_clickable((By.ID, "createAccountButton")))
         driver.execute_script("arguments[0].click();", submit_btn)
 
         # 4. Wait for either an Error OR Success (page transition)
@@ -323,6 +369,13 @@ def finalize_registration(username: str, password: str, driver) -> bool:
         # Steam might be lagging. Wait a bit longer.
         info("Waiting for response...")
         time.sleep(2)
+
+
+def _fill_field(driver, wait, field_id: str, value: str):
+    field = wait.until(EC.visibility_of_element_located((By.ID, field_id)))
+    field.clear()
+    field.send_keys(value)
+    time.sleep(random.uniform(0.5, 1.5))
 
 
 def generate_password(length: int = PASSWORD_LENGTH) -> str:
@@ -454,7 +507,7 @@ def main(
             attempt = 0
             while attempt <= retries:
                 try:
-                    success_run, email_addr, username, password = run_once(
+                    success_run, email_addr, username, password, steam_id = run_once(
                         driver, password_length
                     )
                     if success_run:
@@ -466,6 +519,7 @@ def main(
                                 email_addr,
                                 username,
                                 password,
+                                steam_id=steam_id,
                                 ban_type=kuroi_ban_type,
                                 is_public=kuroi_is_public,
                             )
@@ -481,6 +535,7 @@ def main(
                         "invalid session id" in msg
                         or "session deleted" in msg
                         or "chrome not reachable" in msg
+                        or "stale element reference" in msg
                     ):
                         attempt += 1
                         warn(
